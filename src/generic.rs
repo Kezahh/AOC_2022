@@ -7,3 +7,12 @@ pub fn read_in_file(input_filename: &str) -> Vec<String> {
     let file_lines: Vec<String> = split.map(str::to_string).collect();
     return file_lines.clone();
 }
+
+pub fn print_2d_map(input_map: &Vec<Vec<i32>>) {
+    for row in input_map {
+        for col in row {
+            print!("{}", col);
+        }
+        print!("\n");
+    }
+}
