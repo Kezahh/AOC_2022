@@ -5,6 +5,13 @@ use std::thread::current;
 use std::fmt;
 
 
+#[derive(Eq, PartialEq)]
+enum PacketResult {
+    Lose = 0,
+    Tie = 1,
+    Win = 2,
+}
+
 #[derive(Eq, PartialEq, Debug)]
 struct PacketData {
     index: usize,
@@ -46,7 +53,6 @@ impl PacketData {
 
         match input_string.parse::<usize>() {
             Ok(number) => {
-                println!("adding number");
                 if parent_packet_index != None {
                     let new_packet_index = Self::add_new(all_packets, Some(number), false);
                     all_packets[parent_packet_index.unwrap()].data.push(new_packet_index);
@@ -56,7 +62,6 @@ impl PacketData {
                 }
             }
             Err(error) => {
-                println!("adding list");
                 if parent_packet_index != None {
                     let new_packet_index = Self::add_list(input_string, all_packets);
                     all_packets[parent_packet_index.unwrap()].data.push(new_packet_index);
@@ -129,6 +134,58 @@ impl PacketData {
             return full_string
         }
     }
+
+    fn make_integer_into_list(all_packets: &mut Vec<PacketData>, packet_index: usize) -> usize {
+        let new_index = Self::add_new(all_packets, None, false);
+        all_packets[new_index].data.push(packet_index);
+
+        return new_index;
+    }
+}
+
+fn left_packet_good_order(all_packets: &mut Vec<PacketData>, left_packet_index: usize, right_packet_index: usize) -> PacketResult {
+
+    println!("\t(compare) left = {:?}, right = {:?}", all_packets[left_packet_index].get_string(all_packets), all_packets[right_packet_index].get_string(all_packets));
+    
+    if all_packets[left_packet_index].is_integer && all_packets[right_packet_index].is_integer {
+        if all_packets[left_packet_index].value < all_packets[right_packet_index].value {
+            return PacketResult::Win;
+        } else if all_packets[left_packet_index].value == all_packets[right_packet_index].value {
+            return PacketResult::Tie;
+        } else {
+            return PacketResult::Lose;
+        }
+    } else if all_packets[left_packet_index].is_blank && all_packets[right_packet_index].is_blank {
+        return PacketResult::Tie;
+    } else if all_packets[left_packet_index].is_blank && !all_packets[right_packet_index].is_blank {
+        return PacketResult::Win;
+    } else if !all_packets[left_packet_index].is_blank && all_packets[right_packet_index].is_blank {
+        return PacketResult::Lose;
+    } else if all_packets[left_packet_index].is_integer {
+        let new_left_packet_index = PacketData::make_integer_into_list(all_packets, left_packet_index);
+        return left_packet_good_order(all_packets, new_left_packet_index, right_packet_index);
+    } else if all_packets[right_packet_index].is_integer {
+        let new_right_packet_index = PacketData::make_integer_into_list(all_packets, right_packet_index);
+        return left_packet_good_order(all_packets, left_packet_index, new_right_packet_index);
+    } else {
+        let mut data_index = 0;
+        while data_index < all_packets[left_packet_index].data.len() {
+            if data_index >= all_packets[right_packet_index].data.len() {
+                return PacketResult::Lose;
+            }
+            let check_packets = left_packet_good_order(all_packets, all_packets[left_packet_index].data[data_index], all_packets[right_packet_index].data[data_index]);
+            if check_packets != PacketResult::Tie {
+                return check_packets;
+            }
+            data_index += 1;
+        }
+        
+        if all_packets[right_packet_index].data.len() > data_index {
+            return PacketResult::Win;
+        } else {
+            return PacketResult::Tie;
+        }
+    }
 }
 
 
@@ -141,21 +198,32 @@ fn solve_puzzle(input_filename: &str) -> usize {
     while packet_index < input_lines.len() {
         let packet_1_index = PacketData::add_from_string(input_lines[packet_index].clone(), None, &mut all_packets);
         let packet_2_index = PacketData::add_from_string(input_lines[packet_index+1].clone(), None, &mut all_packets);
-
         ordered_packets.push(vec![packet_1_index, packet_2_index]);
-
         packet_index += 3;
     }
 
-    for packets in ordered_packets.iter() {
-        for p in packets.iter() {
-            if !all_packets[*p].is_integer {
-                println!("{:?}", all_packets[*p].get_string(&all_packets));
-            }
+    let mut good_indices: Vec<usize> = Vec::new();
+    let mut packet_index = 1;
+    for packets in ordered_packets {
+        println!("(compare) left = {:?}", all_packets[packets[0]].get_string(&all_packets));
+        println!("(compare) right = {:?}", all_packets[packets[1]].get_string(&all_packets));
+        if left_packet_good_order(&mut all_packets, packets[0], packets[1]) == PacketResult::Win {
+            println!("Left wins.");
+            good_indices.push(packet_index);
         }
+
+        packet_index += 1;
+
+        // if packet_index == 10 {
+        //     break;
+        // }
     }
 
-    return 0
+    let index_sum: usize = good_indices.iter().sum();
+    println!("Good indices are {:?}", good_indices);
+    println!("Sum is {}", index_sum);
+
+    return index_sum;
 }
 
 
@@ -166,11 +234,15 @@ mod tests {
 
     #[test]
     fn example_1() {
-        assert!(solve_puzzle("src/inputs/day_13/input_example_1.txt") == 31);
+        assert!(solve_puzzle("src/inputs/day_13/input_example_1.txt") == 13);
     }
 
     #[test]
     fn part_1() {
+        assert!(solve_puzzle("src/inputs/day_13/input.txt") == 5682);
+        // 230 is too low
+        // 5338 is too low
+        // 5964 is too high
     }
 
     #[test]
