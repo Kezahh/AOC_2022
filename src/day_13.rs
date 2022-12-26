@@ -145,7 +145,7 @@ impl PacketData {
 
 fn left_packet_good_order(all_packets: &mut Vec<PacketData>, left_packet_index: usize, right_packet_index: usize) -> PacketResult {
 
-    println!("\t(compare) left = {:?}, right = {:?}", all_packets[left_packet_index].get_string(all_packets), all_packets[right_packet_index].get_string(all_packets));
+    //println!("\t(compare) left = {:?}, right = {:?}", all_packets[left_packet_index].get_string(all_packets), all_packets[right_packet_index].get_string(all_packets));
     
     if all_packets[left_packet_index].is_integer && all_packets[right_packet_index].is_integer {
         if all_packets[left_packet_index].value < all_packets[right_packet_index].value {
@@ -189,7 +189,7 @@ fn left_packet_good_order(all_packets: &mut Vec<PacketData>, left_packet_index: 
 }
 
 
-fn solve_puzzle(input_filename: &str) -> usize {
+fn solve_puzzle(input_filename: &str, part_2: bool) -> usize {
     let input_lines = generic::read_in_file(input_filename);
     let mut all_packets: Vec<PacketData> = Vec::new();
     let mut ordered_packets: Vec<Vec<usize>> = Vec::new();
@@ -202,31 +202,108 @@ fn solve_puzzle(input_filename: &str) -> usize {
         packet_index += 3;
     }
 
-    let mut good_indices: Vec<usize> = Vec::new();
-    let mut packet_index = 1;
-    for packets in ordered_packets {
-        println!("(compare) left = {:?}", all_packets[packets[0]].get_string(&all_packets));
-        println!("(compare) right = {:?}", all_packets[packets[1]].get_string(&all_packets));
-        if left_packet_good_order(&mut all_packets, packets[0], packets[1]) == PacketResult::Win {
-            println!("Left wins.");
-            good_indices.push(packet_index);
+    if !part_2 {
+        let mut good_indices: Vec<usize> = Vec::new();
+        let mut packet_index = 1;
+        for packets in ordered_packets {
+            println!("(compare) left = {:?}", all_packets[packets[0]].get_string(&all_packets));
+            println!("(compare) right = {:?}", all_packets[packets[1]].get_string(&all_packets));
+            if left_packet_good_order(&mut all_packets, packets[0], packets[1]) == PacketResult::Win {
+                println!("Left wins.");
+                good_indices.push(packet_index);
+            }
+
+            packet_index += 1;
+
+            // if packet_index == 10 {
+            //     break;
+            // }
         }
 
-        packet_index += 1;
+        let index_sum: usize = good_indices.iter().sum();
+        println!("Good indices are {:?}", good_indices);
+        println!("Sum is {}", index_sum);
 
-        // if packet_index == 10 {
-        //     break;
-        // }
+        return index_sum;
+    } else {
+        println!("Begin sorting");
+        let mut to_sort_packets: Vec<usize> = Vec::new();
+        for packets in ordered_packets {
+            for p in packets {
+                to_sort_packets.push(p);
+            }
+        }
+
+        // add divider packets.
+        let divider_index_1: usize = PacketData::add_from_string("[[2]]".to_string(), None, &mut all_packets);
+        let divider_index_2: usize = PacketData::add_from_string("[[6]]".to_string(), None, &mut all_packets);
+        to_sort_packets.push(divider_index_1);
+        to_sort_packets.push(divider_index_2);
+
+        let mut target_packet_index: usize = 1;
+        let mut packet_index: usize = 0;
+        while target_packet_index < to_sort_packets.len() {
+            //print_all_packets(&all_packets, &to_sort_packets, Some(target_packet_index));
+            packet_index = target_packet_index;
+
+            let mut packet_inserted: bool = false;
+            while left_packet_good_order(&mut all_packets, to_sort_packets[target_packet_index], to_sort_packets[packet_index - 1]) == PacketResult::Win {
+                //println!("\t(sort) {} < {}", all_packets[to_sort_packets[target_packet_index]].get_string(&all_packets), all_packets[to_sort_packets[packet_index - 1]].get_string(&all_packets));
+                packet_index -= 1;
+                if packet_index == 0 {
+                    let packet_index_to_move = to_sort_packets[target_packet_index];
+                    to_sort_packets.remove(target_packet_index);
+                    to_sort_packets.insert(0, packet_index_to_move);
+                    packet_inserted = true;
+                    break;
+                }
+            }
+            //println!("\tsort done: target_packet = {}, target_packet_index = {}, packet_index = {}", all_packets[to_sort_packets[target_packet_index]].get_string(&all_packets), target_packet_index, packet_index);
+            if !packet_inserted && (packet_index != target_packet_index) {
+                let packet_index_to_move = to_sort_packets[target_packet_index];
+                to_sort_packets.remove(target_packet_index);
+                to_sort_packets.insert(packet_index, packet_index_to_move);
+            }
+
+            target_packet_index += 1;
+
+        }
+
+        print_all_packets(&all_packets, &to_sort_packets, None);
+        // 1 2 4 3 5 6
+
+        let mut sorted_divider_index_1 = 0;
+        let mut sorted_divider_index_2 = 0;
+
+        for (packet_index, packet) in to_sort_packets.iter().enumerate() {
+            if *packet == divider_index_1 {
+                sorted_divider_index_1 = packet_index + 1;
+            } else if *packet == divider_index_2 {
+                sorted_divider_index_2 = packet_index + 1;
+            }
+        }
+
+        println!("Divider 1 is at index = {}", sorted_divider_index_1);
+        println!("Divider 2 is at index = {}", sorted_divider_index_2);
+        println!("Product = {}", sorted_divider_index_1 * sorted_divider_index_2);
+        return sorted_divider_index_1 * sorted_divider_index_2;
     }
-
-    let index_sum: usize = good_indices.iter().sum();
-    println!("Good indices are {:?}", good_indices);
-    println!("Sum is {}", index_sum);
-
-    return index_sum;
 }
 
-
+fn print_all_packets(all_packets: &Vec<PacketData>, sort_list: &Vec<usize>, target: Option<usize>) {
+    println!("Full List:");
+    for (packet_index, packet) in sort_list.iter().enumerate() {
+        if target != None {
+            if packet_index == target.unwrap() {
+                println!("\t-> {:?}", all_packets[*packet].get_string(&all_packets));
+            } else {
+                println!("\t{:?}", all_packets[*packet].get_string(&all_packets));
+            }
+        } else {
+            println!("\t{:?}", all_packets[*packet].get_string(&all_packets));
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -234,12 +311,12 @@ mod tests {
 
     #[test]
     fn example_1() {
-        assert!(solve_puzzle("src/inputs/day_13/input_example_1.txt") == 13);
+        assert!(solve_puzzle("src/inputs/day_13/input_example_1.txt", false) == 13);
     }
 
     #[test]
     fn part_1() {
-        assert!(solve_puzzle("src/inputs/day_13/input.txt") == 5682);
+        assert!(solve_puzzle("src/inputs/day_13/input.txt", false) == 5682);
         // 230 is too low
         // 5338 is too low
         // 5964 is too high
@@ -247,9 +324,11 @@ mod tests {
 
     #[test]
     fn example_2() {
+        assert!(solve_puzzle("src/inputs/day_13/input_example_1.txt", true) == 140);
     }
 
     #[test]
     fn part_2() {
+        assert!(solve_puzzle("src/inputs/day_13/input.txt", true) == 20304);
     }
 }
