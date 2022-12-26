@@ -62,11 +62,11 @@ fn get_neighbour_points(current_point: &Point, points_map: &Vec<Vec<Point>>) -> 
     // check if char is 1 step above or anything below.
     let mut real_output_vec: Vec<Point> = Vec::new();
     for neighbour in output_vec {
-        let step_change: i32 = neighbour.value as i32 - current_point.value as i32;
-        if (current_point.value == START_CHAR || 
-            (neighbour.value != END_CHAR && current_point.value >= neighbour.value) || 
+        let step_change: i32 = current_point.value as i32 - neighbour.value as i32;
+        if ((current_point.value == END_CHAR && (neighbour.value == 'z' || neighbour.value == 'y')) || 
+            (current_point.value != END_CHAR && current_point.value <= neighbour.value) || 
             step_change == 1 ||
-            (neighbour.value == END_CHAR && (current_point.value == 'z' || current_point.value == 'y'))) {
+            (neighbour.value == START_CHAR && (current_point.value == 'a' || current_point.value == 'b'))) {
             real_output_vec.push(neighbour);
         }
     }
@@ -108,12 +108,16 @@ fn get_end_point(points_map: &Vec<Vec<Point>>) -> Point {
     return points_map[0][0].clone();
 }
 
-fn get_distance_to_start(target_point: &Point, points_map: &Vec<Vec<Point>>) -> usize {
+fn get_distance_to_end(target_point: &Point, points_map: &Vec<Vec<Point>>) -> usize {
     let mut distance = 0;
     let mut current_point = target_point.clone();
-    while (current_point.value != START_CHAR) {
+    while (current_point.value != END_CHAR) {
         distance += 1;
         //println!("\t(distance) current point is {:?}", current_point);
+        if current_point.next_point == None {
+            distance = 0;
+            break;
+        }
         let next_point: Vec<usize> = current_point.next_point.unwrap();
         current_point = points_map[next_point[0]][next_point[1]].clone();
     }
@@ -127,11 +131,11 @@ fn get_point_from_points_graph(target_point: &Point, points_graph: &Vec<Vec<Poin
 
 
 fn build_points_graph(points_map: &Vec<Vec<Point>>) -> Vec<Vec<Point>> {
-    let start_point = get_start_point(&points_map);
+    let end_point = get_end_point(&points_map);
     let mut output_graph: Vec<Vec<Point>> = points_map.clone();
 
     let mut points_to_process = VecDeque::new();
-    points_to_process.push_back(start_point.clone());
+    points_to_process.push_back(end_point.clone());
 
     //let test_point = output_graph[1][7].clone();
     //println!("Neighbours are: {:?}", get_neighbour_points(&test_point, &output_graph));
@@ -147,7 +151,7 @@ fn build_points_graph(points_map: &Vec<Vec<Point>>) -> Vec<Vec<Point>> {
         println!("Processing {:?}", current_point);
 
         let mut neighbour_points: Vec<Point> = get_neighbour_points(&current_point, &output_graph);
-        let current_distance: usize = get_distance_to_start(&current_point, &output_graph);
+        let current_distance: usize = get_distance_to_end(&current_point, &output_graph);
 
         println!("\tneighbours are {:?}", neighbour_points);
 
@@ -155,7 +159,7 @@ fn build_points_graph(points_map: &Vec<Vec<Point>>) -> Vec<Vec<Point>> {
             if neighbour.next_point == None {
                 set_neighbour_next_point(&neighbour, &current_point, &mut output_graph);
             } else {
-                let neighbour_distance: usize = get_distance_to_start(&neighbour, &output_graph);
+                let neighbour_distance: usize = get_distance_to_end(&neighbour, &output_graph);
                 println!("\tcurrent distance {} for point {:?}", current_distance, current_point);
                 println!("\tneighbour distance {} for point {:?}", neighbour_distance, neighbour);
                 if current_distance + 1 < neighbour_distance {
@@ -183,7 +187,7 @@ fn build_points_graph(points_map: &Vec<Vec<Point>>) -> Vec<Vec<Point>> {
 }
 
 
-fn solve_puzzle(input_filename: &str) -> usize {
+fn solve_puzzle(input_filename: &str, part_2: bool) -> usize {
     let input_lines = generic::read_in_file(input_filename);
     let mut points_map: Vec<Vec<Point>> = get_points_map(&input_lines);
     let mut points_graph: Vec<Vec<Point>> = build_points_graph(&points_map);
@@ -196,11 +200,29 @@ fn solve_puzzle(input_filename: &str) -> usize {
         //print!("\n");
     }
 
-    let end_point = get_end_point(&points_graph);
-    let end_distance = get_distance_to_start(&end_point, &points_graph);
+    if !part_2 {
+        let start_point = get_start_point(&points_graph);
+        let start_distance = get_distance_to_end(&start_point, &points_graph);
 
-    println!("End distance = {}", end_distance);
-    return end_distance;
+        println!("Distance from start = {}", start_distance);
+        return start_distance;
+    } else {
+        let mut min_distance = 0;
+
+        for points_row in points_graph.iter() {
+            for point in points_row.iter() {
+                if point.value == 'a' {
+                    let distance = get_distance_to_end(&point, &points_graph);
+                    if distance > 0 && (distance < min_distance || min_distance == 0) {
+                        min_distance = distance;
+                    }
+                }
+            }
+        }
+
+        println!("Best distance = {}", min_distance);
+        return min_distance;
+    }
 }
 
 
@@ -211,19 +233,21 @@ mod tests {
 
     #[test]
     fn example_1() {
-        assert!(solve_puzzle("src/inputs/day_12/input_example_1.txt") == 31);
+        assert!(solve_puzzle("src/inputs/day_12/input_example_1.txt", false) == 31);
     }
 
     #[test]
     fn part_1() {
-        assert!(solve_puzzle("src/inputs/day_12/input.txt") == 447);
+        assert!(solve_puzzle("src/inputs/day_12/input.txt", false) == 447);
     }
 
     #[test]
     fn example_2() {
+        assert!(solve_puzzle("src/inputs/day_12/input_example_1.txt", true) == 29);
     }
 
     #[test]
     fn part_2() {
+        assert!(solve_puzzle("src/inputs/day_12/input.txt", true) == 446);
     }
 }
